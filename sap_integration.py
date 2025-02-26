@@ -48,6 +48,9 @@ class SAPIntegrationDialog:
         
         # Focar janela
         self.dialog.focus_force()
+
+        self.last_payload = None
+        self.result = False
     
     # Métodos auxiliares
     def log(self, message, level="info"):
@@ -225,7 +228,6 @@ class SAPIntegrationDialog:
             }
             
             # Log do payload para debug
-            self.log(f"Payload preparado: {json.dumps(payload, ensure_ascii=False)}", "info")
             return payload
             
         except Exception as e:
@@ -252,59 +254,36 @@ class SAPIntegrationDialog:
     
     # Envio para o SAP
     def send_to_sap(self):
-        """Envia dados para o SAP"""
-        if not self.validate_fields():
-            return
+            if not self.validate_fields():
+                return
+            
+            try:
+                payload = self.build_payload()
+                self.last_payload = payload
+                self.log("Enviando requisição...", "info")
                 
-        try:
-            # 1. Preparar payload
-            payload = self.build_payload()
-            self.log("Enviando requisição...", "info")
-            
-            # 2. Enviar requisição
-            response = requests.post(
-                self.params["URL_API"],
-                json=payload,
-                auth=(self.creds['usuario'], self.creds['senha']),
-                headers={'Content-Type': 'application/json'},
-                timeout=30
-            )
-            self.response = response
-            
-            # 3. Registrar resposta independente do resultado
-            if hasattr(self.dialog.master, 'update_sap_response'):
-                self.dialog.master.update_sap_response(response)
+                response = requests.post(
+                    self.params["URL_API"],
+                    json=payload,
+                    auth=(self.creds['usuario'], self.creds['senha']),
+                    headers={'Content-Type': 'application/json'},
+                    timeout=30
+                )
+                self.response = response
                 
-            if hasattr(self.dialog.master, 'add_to_history'):
-                self.dialog.master.add_to_history(payload, response)
-            
-            # 4. Log da resposta (sucesso ou erro)
-            status_text = "success" if response.status_code == 200 else "error"
-            self.log(f"Status da resposta: {response.status_code}", status_text)
-            self.log(f"Resposta: {response.text}", status_text)
-            
-            # 5. Processar resultado
-            if response.status_code == 200:
-                self.result = True
-                messagebox.showinfo("Sucesso", "Envio realizado com sucesso!")
-                self.dialog.destroy()
-            else:
-                messagebox.showerror("Erro", f"Erro no envio: {response.text}")
-                
-        except requests.exceptions.Timeout:
-            error_msg = "Timeout na conexão com o SAP"
-            self.log(error_msg, "error")
-            if hasattr(self.dialog.master, 'update_sap_response'):
-                self.dialog.master.update_sap_response({"status_code": 408, "text": error_msg})
-            messagebox.showerror("Erro", error_msg)
-            
-        except Exception as e:
-            error_msg = f"Erro durante o envio: {str(e)}"
-            self.log(error_msg, "error")
-            if hasattr(self.dialog.master, 'update_sap_response'):
-                self.dialog.master.update_sap_response({"status_code": 500, "text": error_msg})
-            messagebox.showerror("Erro", error_msg)
-    
+                if response.status_code == 200:
+                    self.result = True
+                    messagebox.showinfo("Sucesso", "Envio realizado com sucesso!")
+                    self.dialog.destroy()
+                else:
+                    messagebox.showerror("Erro", f"Erro no envio: {response.text}")
+                    
+            except Exception as e:
+                self.response = None
+                error_msg = f"Erro durante o envio: {str(e)}"
+                self.log(error_msg, "error")
+                messagebox.showerror("Erro", error_msg)
+
     # Centralização do diálogo
     def center_dialog(self, parent):
         """Centraliza o diálogo em relação à janela pai"""

@@ -120,6 +120,7 @@ class PDFtoJSONApp:
         self.root = root
         self.root.title("Um dia da bom")
         self.root.minsize(600, 550)
+        self.root.geometry("650x600") 
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(4, weight=1)
         
@@ -188,7 +189,8 @@ class PDFtoJSONApp:
             self.log_frame,
             yscrollcommand=log_y_scroll.set,
             wrap=tk.WORD,
-            bg="#f5f5f5"
+            bg="#f5f5f5",
+            state=tk.NORMAL
         )
         
         # Layout do log
@@ -275,15 +277,56 @@ class PDFtoJSONApp:
         # Log inicial
         self.add_log("Aplicação iniciada", "info")
     
+    # Função para atualizar a resposta do SAP
+    def update_sap_response(self, response):
+        """Exibe apenas a resposta da API no label do SAP."""
+        try:
+            status = response.status_code if hasattr(response, 'status_code') else "N/A"
+            text = response.text if hasattr(response, 'text') else str(response)
+            msg = f"Status: {status}\n{text}"
+            
+            self.sap_response_label.config(text=msg) 
+
+        except Exception as e:
+            self.add_log(f"Erro ao atualizar resposta SAP: {e}", "error")
+
+    # Função para adicionar entrada ao histórico
+    def add_to_history(self, payload, response):
+        """Registra o payload enviado e a resposta do SAP no histórico."""
+        try:
+            self.text_history.config(state=tk.NORMAL)  
+            
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            status_code = response.status_code if hasattr(response, 'status_code') else "N/A"
+            response_text = response.text if hasattr(response, 'text') else str(response)
+            
+            entry = f"""
+    {'='*80}
+    DATA/HORA: {timestamp}
+    STATUS: {status_code}
+
+    PAYLOAD ENVIADO:
+    {json.dumps(payload, indent=2, ensure_ascii=False)}
+
+    RESPOSTA RECEBIDA:
+    {response_text}
+    {'='*80}
+    """
+
+            self.text_history.insert("1.0", entry)
+            self.text_history.see("1.0")  
+
+        finally:
+            self.text_history.config(state=tk.DISABLED)  
+
     # Função para adicionar entradas ao log
     def add_log(self, message, level="info"):
-        """Adiciona uma entrada ao log com formatação de cor baseada no nível"""
-        import datetime
-        timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+        """Adiciona apenas mensagens e a resposta do SAP ao log, sem incluir payloads grandes."""
+        timestamp = datetime.now().strftime("%H:%M:%S")
         self.text_log.insert(tk.END, f"[{timestamp}] ", "info")
         self.text_log.insert(tk.END, f"{message}\n", level)
-        self.text_log.see(tk.END)  # Rola para o final do log
-        self.root.update_idletasks()  # Atualiza imediatamente a interface
+        self.text_log.see(tk.END)  
+        self.root.update_idletasks() 
 
     # Retorna as opções de fornecedores para o dropdown 
     def get_supplier_options(self):
@@ -464,62 +507,36 @@ class PDFtoJSONApp:
             return
                 
         try:
-            # Usar diretamente a classe SAPIntegrationDialog ao invés da função send_json_to_sap
             dialog = SAPIntegrationDialog(
-                self.root, 
-                self.accumulated_json,
+                parent=self.root, 
+                json_data=self.accumulated_json,
                 log_callback=self.add_log
             )
             
-            # Se houve resposta do SAP
+            # Esperar o diálogo fechar
+            self.root.wait_window(dialog.dialog)
+            
+            # Processar resultado após o diálogo fechar
             if dialog.response:
-                try:
-                    # Registrar no histórico
-                    self.text_history.config(state=tk.NORMAL)
-                    
-                    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    entry = f"""
-    {'='*80}
-    DATA/HORA: {timestamp}
-    STATUS: {dialog.response.status_code}
-
-    PAYLOAD ENVIADO:
-    {json.dumps(self.accumulated_json, indent=2, ensure_ascii=False)}
-
-    RESPOSTA RECEBIDA:
-    {dialog.response.text}
-    {'='*80}
-
-    """
-                    # Inserir no início do histórico
-                    self.text_history.insert("1.0", entry)
-                    self.text_history.see("1.0")
-                    
-                    # Atualizar label de resposta
-                    msg = f"Status: {dialog.response.status_code}\n{dialog.response.text}"
-                    self.sap_response_label.config(text=msg)
-                    
-                    # Log da resposta
-                    status_text = "success" if dialog.response.status_code == 200 else "error"
-                    self.add_log(f"Resposta SAP (Status: {dialog.response.status_code})", status_text)
-                    self.add_log(f"Resposta completa: {dialog.response.text}", status_text)
-                    
-                    # Mudar para aba de histórico
-                    self.notebook.select(2)
-                    
-                    # Se sucesso, limpar JSON
-                    if dialog.response.status_code == 200:
-                        self.accumulated_json = []
-                        self.text_json_input.delete("1.0", tk.END)
-                        self.add_log("JSON limpo após envio bem-sucedido", "success")
-                    
-                finally:
-                    self.text_history.config(state=tk.DISABLED)
-                    
+                # Atualizar histórico
+                self.add_to_history(dialog.last_payload, dialog.response)
+                
+                # Atualizar label de resposta
+                self.update_sap_response(dialog.response)
+                
+                # Se sucesso, limpar JSON
+                if dialog.result:
+                    self.accumulated_json = []
+                    self.text_json_input.delete("1.0", tk.END)
+                    self.add_log("JSON limpo após envio bem-sucedido", "success")
+                
+                # Mudar para aba de histórico
+                self.notebook.select(2)
+                        
         except Exception as e:
             self.add_log(f"Erro ao enviar para SAP: {e}", "error")
             messagebox.showerror("Erro", f"Erro ao enviar para SAP: {e}")
-        
+
 if __name__ == "__main__":
     root = tk.Tk()
     app = PDFtoJSONApp(root)
