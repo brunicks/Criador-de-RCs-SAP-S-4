@@ -84,7 +84,7 @@ class SAPIntegrationDialog:
         fields = [
             ("Descrição:", ttk.Entry(fields_frame)),
             ("Data Entrega:", DateEntry(fields_frame, width=20, locale='pt_BR', 
-                                    date_pattern='mm/dd/yyyy')),
+                                    date_pattern='dd/mm/yyyy')),
             ("Categoria:", ttk.Combobox(fields_frame, values=["K", "F"], 
                                     state="readonly")),
             ("Centro de Custo:", ttk.Combobox(fields_frame, 
@@ -201,8 +201,29 @@ class SAPIntegrationDialog:
     def build_payload(self):
         """Constrói o payload final para envio ao SAP"""
         try:
-            date_obj = datetime.strptime(self.deliv_date.get(), '%m/%d/%Y')
-            formatted_date = date_obj.strftime('%d %B %Y')
+            date_obj = datetime.strptime(self.deliv_date.get(), '%d/%m/%Y')
+             # Dicionário de meses em português
+            meses_pt = {
+                'January': 'Janeiro',
+                'February': 'Fevereiro',
+                'March': 'Marco',
+                'April': 'Abril',
+                'May': 'Maio',
+                'June': 'Junho',
+                'July': 'Julho',
+                'August': 'Agosto',
+                'September': 'Setembro',
+                'October': 'Outubro',
+                'November': 'Novembro',
+                'December': 'Dezembro'
+            }
+            
+            # Formatar data primeiro em inglês
+            formatted_date_en = date_obj.strftime('%d %B %Y')
+            
+            # Converter para português
+            mes = formatted_date_en.split()[1]
+            formatted_date = formatted_date_en.replace(mes, meses_pt[mes])
             
             # Usar os itens diretamente, sem conversão adicional
             payload = {
@@ -213,15 +234,16 @@ class SAPIntegrationDialog:
                         "REQUESTER": {
                             "USER": str(uuid.uuid4()),
                             "NOME": os.getenv('USERNAME').title(),
-                            "EMAIL": f"{os.getenv('USERNAME')}@sysmex.com"
+                            "EMAIL": f"fernandesj@Sysmex.com"
+                            #"EMAIL": f"{os.getenv('USERNAME')}@sysmex.com"
                         },
                         "TEXT_LINE": self.text_line.get(),
                         "DELIV_DATE": formatted_date,
                         "ACCTASSCAT": self.acctasscat.get(),
                         "COST_CENTER": self.cost_center.get(),
-                        "CONTA_RAZAO": self.conta_razao.get(),
                         "ORDER": "",
                         "PLANT": "2201",
+                        "CONTA_RAZAO": self.conta_razao.get(),
                         "ITEMS": self.json_data  # Usar dados já formatados do json_generator
                     }
                 }
