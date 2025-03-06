@@ -192,7 +192,7 @@ class SAPIntegrationDialog:
         try:
             payload = self.build_payload()
             self.text_json.delete("1.0", tk.END)
-            self.text_json.insert("1.0", json.dumps(payload, indent=4))
+            self.text_json.insert("1.0", json.dumps(payload, indent=4, ensure_ascii=False))
             self.log("Preview atualizado com sucesso")
         except Exception as e:
             self.log(f"Erro ao atualizar preview: {str(e)}")
@@ -206,7 +206,7 @@ class SAPIntegrationDialog:
             meses_pt = {
                 'January': 'Janeiro',
                 'February': 'Fevereiro',
-                'March': 'Marco',
+                'March': 'Março',
                 'April': 'Abril',
                 'May': 'Maio',
                 'June': 'Junho',

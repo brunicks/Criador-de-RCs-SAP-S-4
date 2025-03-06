@@ -37,7 +37,8 @@ def generate_json_input_vivo_movel(data, is_servico, supplier_data):
     json_input = []
     preq_item = 10
 
-    auto_description = f"MesRef{data['mes_referencia']} NumConta{data['numero_conta']}"
+    #auto_description = f"MesRef{data['mes_referencia']} NumConta{data['numero_conta']}"
+    auto_description = "Fatura Vivo Móvel"
     
     for nf in data["notas_fiscais"]:
         item_type = "S" if is_servico else "M"
