@@ -80,6 +80,15 @@ class SAPIntegrationDialog:
         # Grid configuration
         fields_frame.columnconfigure(1, weight=1)
         
+        # Criar lista de valores para o combobox de conta razão com descrições
+        contas_razao_values = []
+        for codigo in self.centros_contas["contas_razao"]:
+            descricao = self.centros_contas.get("contas_razao_descricao", {}).get(codigo, "")
+            if descricao:
+                contas_razao_values.append(f"{codigo} - {descricao}")
+            else:
+                contas_razao_values.append(codigo)
+        
         # Campos usando grid
         fields = [
             ("Descrição:", ttk.Entry(fields_frame)),
@@ -91,7 +100,7 @@ class SAPIntegrationDialog:
                                             values=self.centros_contas["centros_custo"], 
                                             state="readonly")),
             ("Conta Razão:", ttk.Combobox(fields_frame, 
-                                        values=self.centros_contas["contas_razao"], 
+                                        values=contas_razao_values,
                                         state="readonly"))
         ]
         
@@ -202,7 +211,6 @@ class SAPIntegrationDialog:
         """Constrói o payload final para envio ao SAP"""
         try:
             date_obj = datetime.strptime(self.deliv_date.get(), '%d/%m/%Y')
-             # Dicionário de meses em português
             meses_pt = {
                 'January': 'Janeiro',
                 'February': 'Fevereiro',
@@ -218,14 +226,14 @@ class SAPIntegrationDialog:
                 'December': 'Dezembro'
             }
             
-            # Formatar data primeiro em inglês
             formatted_date_en = date_obj.strftime('%d %B %Y')
-            
-            # Converter para português
             mes = formatted_date_en.split()[1]
             formatted_date = formatted_date_en.replace(mes, meses_pt[mes])
             
-            # Usar os itens diretamente, sem conversão adicional
+            # Extrair apenas o código da conta razão (antes do " - ")
+            conta_razao_full = self.conta_razao.get()
+            conta_razao = conta_razao_full.split(" - ")[0] if " - " in conta_razao_full else conta_razao_full
+            
             payload = {
                 "ZSBR_MM_AZU_WEBSHOP_PREQ": {
                     "I_WEBSHOP": {
@@ -234,8 +242,7 @@ class SAPIntegrationDialog:
                         "REQUESTER": {
                             "USER": str(uuid.uuid4()),
                             "NOME": os.getenv('USERNAME').title(),
-                            "EMAIL": f"fernandesj@Sysmex.com"
-                            #"EMAIL": f"{os.getenv('USERNAME')}@sysmex.com"
+                            "EMAIL": "fernandesj@Sysmex.com"
                         },
                         "TEXT_LINE": self.text_line.get(),
                         "DELIV_DATE": formatted_date,
@@ -243,15 +250,14 @@ class SAPIntegrationDialog:
                         "COST_CENTER": self.cost_center.get(),
                         "ORDER": "",
                         "PLANT": "2201",
-                        "CONTA_RAZAO": self.conta_razao.get(),
-                        "ITEMS": self.json_data  # Usar dados já formatados do json_generator
+                        "CONTA_RAZAO": conta_razao,
+                        "ITEMS": self.json_data
                     }
                 }
             }
             
-            # Log do payload para debug
             return payload
-            
+                
         except Exception as e:
             self.log(f"Erro ao construir payload: {e}", "error")
             raise
